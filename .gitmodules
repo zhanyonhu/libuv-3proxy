@@ -1,3 +1,9 @@
 [submodule "thir"]
 	path = thir
 	url = https://github.com/z3APA3A/3proxy.git
+[submodule "third/3proxy"]
+	path = third/3proxy
+	url = https://github.com/z3APA3A/3proxy.git
+[submodule "third/libuv"]
+	path = third/libuv
+	url = https://github.com/joyent/libuv.git
