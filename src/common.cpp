@@ -216,7 +216,7 @@ int parsehostname(char *hostname, struct clientparam *param, unsigned short port
 
 	if(!hostname || !*hostname)return 1;
 	if ( (sp = strchr(hostname, ':')) ) *sp = 0;
-	if(hostname != param->hostname){
+	if ((unsigned char *)hostname != param->hostname){
 		if(param->hostname) myfree(param->hostname);
 		param->hostname = (unsigned char *)mystrdup(hostname);
 	}
@@ -607,7 +607,7 @@ int doconnect(struct clientparam * param){
 		if(!(param->sins.sin_addr.s_addr = param->req.sin_addr.s_addr)) return 100;
 	if(!param->sins.sin_port)param->sins.sin_port = param->req.sin_port;
 	if ((param->remsock=so._socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {return (11);}
-	so._setsockopt(param->remsock, SOL_SOCKET, SO_LINGER, (unsigned char *)&lg, sizeof(lg));
+	so._setsockopt(param->remsock, SOL_SOCKET, SO_LINGER, (char *)&lg, sizeof(lg));
 	memset(&bindsa, 0, sizeof(bindsa));
 	bindsa.sin_family = AF_INET;
 	bindsa.sin_port = param->extport;

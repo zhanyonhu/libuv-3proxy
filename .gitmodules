@@ -7,3 +7,6 @@
 [submodule "third/libuv"]
 	path = third/libuv
 	url = https://github.com/joyent/libuv.git
+[submodule "third/eastl"]
+	path = third/eastl
+	url = https://github.com/paulhodge/EASTL.git

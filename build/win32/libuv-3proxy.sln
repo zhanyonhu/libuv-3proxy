@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.30110.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libuv-3proxy", "libuv-3proxy.vcxproj", "{E6F70E20-BC9D-4D46-AABA-074F8CC0E713}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "http", "http.vcxproj", "{E6F70E20-BC9D-4D46-AABA-074F8CC0E713}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "socks", "socks.vcxproj", "{B11145F9-704A-44E4-A96D-545AA4BE1F1E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{E6F70E20-BC9D-4D46-AABA-074F8CC0E713}.Debug|Win32.Build.0 = Debug|Win32
 		{E6F70E20-BC9D-4D46-AABA-074F8CC0E713}.Release|Win32.ActiveCfg = Release|Win32
 		{E6F70E20-BC9D-4D46-AABA-074F8CC0E713}.Release|Win32.Build.0 = Release|Win32
+		{B11145F9-704A-44E4-A96D-545AA4BE1F1E}.Debug|Win32.ActiveCfg = Debug|Win32
+		{B11145F9-704A-44E4-A96D-545AA4BE1F1E}.Debug|Win32.Build.0 = Debug|Win32
+		{B11145F9-704A-44E4-A96D-545AA4BE1F1E}.Release|Win32.ActiveCfg = Release|Win32
+		{B11145F9-704A-44E4-A96D-545AA4BE1F1E}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

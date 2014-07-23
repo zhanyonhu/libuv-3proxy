@@ -11,7 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{E6F70E20-BC9D-4D46-AABA-074F8CC0E713}</ProjectGuid>
+    <ProjectGuid>{B11145F9-704A-44E4-A96D-545AA4BE1F1E}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>libuv3proxy</RootNamespace>
   </PropertyGroup>
@@ -51,8 +51,9 @@
       </PrecompiledHeader>
       <WarningLevel>Level1</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>NOPORTMAP;MSVC;WITHMAIN;WITH_STD_MALLOC;BUILD_WINDOWS;WIN32;_WIN32;NOPLUGINS;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;_LIB;WITHMAIN;WITH_STD_MALLOC;BUILD_WINDOWS;WIN32;_WIN32;NOPLUGINS;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>SO_REUSEPORT;NOIPV6;NOPORTMAP;MSVC;WITHMAIN;WITH_STD_MALLOC;BUILD_WINDOWS;WIN32;_WIN32;NOPLUGINS;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>../../third/eastl/include;</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -68,8 +69,9 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NOPORTMAP;MSVC;WITHMAIN;WITH_STD_MALLOC;BUILD_WINDOWS;WIN32;_WIN32;NOPLUGINS;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;_LIB;WITH_STD_MALLOC;BUILD_WINDOWS;WIN32;_WIN32;NOPLUGINS;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>SO_REUSEPORT;NOIPV6;NOPORTMAP;MSVC;WITHMAIN;WITH_STD_MALLOC;BUILD_WINDOWS;WIN32;_WIN32;NOPLUGINS;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;_CONSOLE;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>../../third/eastl/include;</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -80,25 +82,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\..\src\base64.c" />
-    <ClCompile Include="..\..\src\common.c" />
-    <ClCompile Include="..\..\src\ftp.c" />
+    <ClCompile Include="..\..\src\base64.cpp" />
+    <ClCompile Include="..\..\src\common.cpp" />
+    <ClCompile Include="..\..\src\ftp.cpp" />
     <ClCompile Include="..\..\src\libs\md4.c" />
     <ClCompile Include="..\..\src\libs\md5.c" />
     <ClCompile Include="..\..\src\libs\smbdes.c" />
-    <ClCompile Include="..\..\src\myalloc.c" />
-    <ClCompile Include="..\..\src\proxy.c" />
-    <ClCompile Include="..\..\src\sockgetchar.c" />
-    <ClCompile Include="..\..\src\sockmap.c" />
+    <ClCompile Include="..\..\src\myalloc.cpp" />
+    <ClCompile Include="..\..\src\sockgetchar.cpp" />
+    <ClCompile Include="..\..\src\sockmap.cpp" />
+    <ClCompile Include="..\..\src\socks.cpp" />
     <ClCompile Include="..\..\src\stringtable.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\define.h" />
     <ClInclude Include="..\..\src\libs\md4.h" />
     <ClInclude Include="..\..\src\libs\md5.h" />
-    <ClInclude Include="..\..\src\proxy.h" />
     <ClInclude Include="..\..\src\pstdint.h" />
     <ClInclude Include="..\..\src\structures.h" />
     <ClInclude Include="..\..\src\version.h" />

@@ -378,7 +378,7 @@
 #endif
 #ifndef uint32_t
 #if (ULONG_MAX == UINT32_MAX) || defined (S_SPLINT_S)
-  typedef unsigned long uint32_t;
+//  typedef unsigned long uint32_t;
 # define UINT32_C(v) v ## UL
 # ifndef PRINTF_INT32_MODIFIER
 #  define PRINTF_INT32_MODIFIER "l"
@@ -408,7 +408,7 @@
 #endif
 #ifndef int32_t
 #if (LONG_MAX == INT32_MAX) || defined (S_SPLINT_S)
-  typedef signed long int32_t;
+//  typedef signed long int32_t;
 # define INT32_C(v) v ## L
 # ifndef PRINTF_INT32_MODIFIER
 #  define PRINTF_INT32_MODIFIER "l"

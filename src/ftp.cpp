@@ -21,7 +21,7 @@ int ftplogin(struct clientparam *param, char *nbuf, int *innbuf) {
 
 	if(innbuf)*innbuf = 0;
 	if(len < 48) return 707;
-	while((i = sockgetlinebuf(param, SERVER, (unsigned char *)buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while((i = sockgetlinebuf(param, SERVER, buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 	}
 	if(i < 3) return 706;
 	buf[i] = 0;
@@ -35,7 +35,7 @@ int ftplogin(struct clientparam *param, char *nbuf, int *innbuf) {
 	}
 	param->statscli64 += (int)strlen(buf);
 	param->nwrites++;
-	while((i = sockgetlinebuf(param, SERVER, (unsigned char *)buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while((i = sockgetlinebuf(param, SERVER, buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 	}
 	if(i < 3) return 704;
 	buf[i] = 0;
@@ -52,7 +52,7 @@ int ftplogin(struct clientparam *param, char *nbuf, int *innbuf) {
 		}
 	param->statscli64 += res;
 		param->nwrites++;
-		while((i = sockgetlinebuf(param, SERVER, (unsigned char *)buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0){
+		while((i = sockgetlinebuf(param, SERVER, buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0){
 			buf[i] = 0;
 			res = (i>3 && buf[3] != '-')? atoi(buf)/100 : 0;
 			if(res || (nbuf && (len-i) > 256 && i > 3)) {
@@ -83,7 +83,7 @@ int ftpcd(struct clientparam *param, unsigned char* path, char *nbuf, int *innbu
 	}
 	param->statscli64 += (int)strlen(buf);
 	param->nwrites++;
-	while((i = sockgetlinebuf(param, SERVER, (unsigned char *)buf, sizeof(buf) - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while((i = sockgetlinebuf(param, SERVER, buf, sizeof(buf) - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 		if(nbuf && innbuf && inbuf + i < *innbuf && i > 6) {
 			memcpy(nbuf + inbuf, buf, i);
 			inbuf += i;
@@ -100,7 +100,7 @@ int ftpres(struct clientparam *param, unsigned char * buf, int l){
 	int i;
 
 	if (l < 16) return 755;
-	while((i = sockgetlinebuf(param, SERVER, buf, l - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while ((i = sockgetlinebuf(param, SERVER, (char *)buf, l - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 	}
 	buf[i] = 0;
 	if(i < 3) return 751;
@@ -116,7 +116,7 @@ int ftpsyst(struct clientparam *param, unsigned char *buf, unsigned len){
 	}
 	param->statscli64 += 6;
 	param->nwrites++;
-	while((i = sockgetlinebuf(param, SERVER, buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while ((i = sockgetlinebuf(param, SERVER, (char *)buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 	}
 	if(i < 7) return 722;
 	buf[3] = 0;
@@ -135,7 +135,7 @@ int ftppwd(struct clientparam *param, unsigned char *buf, unsigned len){
 	}
 	param->statscli64 += 5;
 	param->nwrites++;
-	while((i = sockgetlinebuf(param, SERVER, buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while ((i = sockgetlinebuf(param, SERVER, (char *)buf, len - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 	}
 	if(i < 7) return 732;
 	buf[3] = 0;
@@ -160,7 +160,7 @@ int ftptype(struct clientparam *param, unsigned char* f_type){
 	}
 	param->statscli64 += (int)strlen(buf);
 	param->nwrites++;
-	while((i = sockgetlinebuf(param, SERVER, (unsigned char *)buf, sizeof(buf) - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while((i = sockgetlinebuf(param, SERVER, buf, sizeof(buf) - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 	}
 	if(i < 3) return 742;
 	if(buf[0] != '2') return 740;
@@ -181,7 +181,7 @@ SOCKET ftpdata(struct clientparam *param){
 	}
 	param->statscli64 += 6;
 	param->nwrites++;
-	while((i = sockgetlinebuf(param, SERVER, (unsigned char *)buf, sizeof(buf) - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while((i = sockgetlinebuf(param, SERVER, buf, sizeof(buf) - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 	}
 	if(i < 7) return INVALID_SOCKET;
 	if(buf[0] != '2') return INVALID_SOCKET;
@@ -219,7 +219,7 @@ SOCKET ftpcommand(struct clientparam *param, unsigned char * command, unsigned c
 	}
 	param->statscli64 += (int)strlen(buf);
 	param->nwrites++;
-	while((i = sockgetlinebuf(param, SERVER, (unsigned char *)buf, sizeof(buf) - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
+	while((i = sockgetlinebuf(param, SERVER, buf, sizeof(buf) - 1, '\n', conf.timeouts[STRING_L])) > 0 && (i < 3 || !isnumber(*buf) || buf[3] == '-')){
 	}
 	if(i < 3) {
 		so._closesocket(s);

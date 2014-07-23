@@ -125,7 +125,7 @@ int MODULEMAINFUNC (int argc, char** argv){
  srvinit(&srv, &defparam);
  srv.pf = childdef.pf;
  isudp = childdef.isudp;
- srv.service = defparam.service = childdef.service;
+ srv.service = defparam.service = (PROXYSERVICE)childdef.service;
  
 #ifndef STDMAIN
  srv.acl = copyacl(conf.acl);
@@ -173,7 +173,7 @@ int MODULEMAINFUNC (int argc, char** argv){
 			}
 			break;
 		 case 'i':
-			getip46(46, argv[i]+2, (struct sockaddr *)&srv.intsa);
+			 getip46(46, (unsigned char *)(argv[i] + 2), (struct sockaddr *)&srv.intsa);
 			break;
 		 case 'e':
 			srv.extip = getip((unsigned char *)argv[i]+2);
@@ -344,9 +344,9 @@ int MODULEMAINFUNC (int argc, char** argv){
 	fcntl(sock,F_SETFL,O_NONBLOCK);
 #endif
 	srv.srvsock = sock;
-	if(so._setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (unsigned char *)&opt, sizeof(int)))perror("setsockopt()");
+	if(so._setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(int)))perror("setsockopt()");
 #ifdef SO_REUSEPORT
-	so._setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (unsigned char *)&opt, sizeof(int));
+	so._setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (char *)&opt, sizeof(int));
 #endif
  }
 
@@ -433,12 +433,12 @@ int MODULEMAINFUNC (int argc, char** argv){
 #else
 		fcntl(new_sock,F_SETFL,O_NONBLOCK);
 #endif
-		so._setsockopt(new_sock, SOL_SOCKET, SO_LINGER, (unsigned char *)&lg, sizeof(lg));
-		so._setsockopt(new_sock, SOL_SOCKET, SO_OOBINLINE, (unsigned char *)&opt, sizeof(int));
+		so._setsockopt(new_sock, SOL_SOCKET, SO_LINGER, (char *)&lg, sizeof(lg));
+		so._setsockopt(new_sock, SOL_SOCKET, SO_OOBINLINE, (char *)&opt, sizeof(int));
 	}
 	else 
 		srv.fds.events = 0;
-	if(! (newparam = myalloc (sizeof(defparam)))){
+	if (!(newparam = (struct clientparam *)myalloc(sizeof(defparam)))){
 		if(!isudp) so._closesocket(new_sock);
 		defparam.res = 21;
 		if(!srv.silent)(*srv.logfunc)(&defparam, (unsigned char *)"Memory Allocation Failed");
@@ -446,7 +446,7 @@ int MODULEMAINFUNC (int argc, char** argv){
 		continue;
 	};
 	memcpy(newparam, &defparam, sizeof(defparam));
-	if(defparam.hostname)newparam->hostname=strdup(defparam.hostname);
+	if (defparam.hostname)newparam->hostname = (unsigned char *)strdup((const char *)defparam.hostname);
 	clearstat(newparam);
 	if(!isudp) newparam->clisock = new_sock;
 #ifndef STDMAIN

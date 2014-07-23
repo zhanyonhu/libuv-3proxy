@@ -38,7 +38,7 @@ unsigned char* en64 (const unsigned char *in, unsigned char *out, int inlen)
     return out;
 }
 
-int de64 (const char *in, char *out, int maxlen)
+int de64(const char *in, unsigned char *out, int maxlen)
 {
     int len = 0;
     register unsigned char digit1, digit2, digit3, digit4;
