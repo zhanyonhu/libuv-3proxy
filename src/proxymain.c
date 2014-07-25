@@ -341,17 +341,21 @@ int MODULEMAINFUNC (int argc, char** argv){
 
 #ifndef _WIN32
  if(inetd) {
-	fcntl(0,F_SETFL,O_NONBLOCK);
-	if(!isudp){
-		so._setsockopt(0, SOL_SOCKET, SO_LINGER, (unsigned char *)&lg, sizeof(lg));
-		so._setsockopt(0, SOL_SOCKET, SO_OOBINLINE, (unsigned char *)&opt, sizeof(int));
-	}
-	defparam.clisock = 0;
-	if(! (newparam = myalloc (sizeof(defparam)))){
-		return 2;
-	};
-	memcpy(newparam, &defparam, sizeof(defparam));
-	return((*srv.pf)((void *)newparam)? 1:0);
+// 	fcntl(0,F_SETFL,O_NONBLOCK);
+// 	if(!isudp){
+// 		so._setsockopt(0, SOL_SOCKET, SO_LINGER, (unsigned char *)&lg, sizeof(lg));
+// 		so._setsockopt(0, SOL_SOCKET, SO_OOBINLINE, (unsigned char *)&opt, sizeof(int));
+// 	}
+// 	defparam.clisock = 0;
+// 	if(! (newparam = myalloc (sizeof(defparam)))){
+// 		return 2;
+// 	};
+// 	memcpy(newparam, &defparam, sizeof(defparam));
+// 	return((*srv.pf)((void *)newparam)? 1:0);
+
+	 /////////////////////////////////////////
+	 //none 
+	 return -1;
 	
  }
 #endif
@@ -373,9 +377,10 @@ int MODULEMAINFUNC (int argc, char** argv){
 
 
 #endif
+
  uv_tcp_init(srv.loop, &srv.server);
 
- struct sockaddr_in bind_addr = uv_ip4_addr("0.0.0.0", 7000);
+ struct sockaddr_in bind_addr = uv_ip4_addr("0.0.0.0", childdef.port);
  uv_tcp_bind(&server, bind_addr);
  int r = uv_listen((uv_stream_t*)&server, 128, on_new_connection);
  if (r) {
