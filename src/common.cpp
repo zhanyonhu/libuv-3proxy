@@ -59,7 +59,7 @@ struct extparam conf = {
 	NULL, NULL,
 	NULL,
 	NULL,
-	0, -1, 0, 0, 0, 0, 0, 500, 0, 0, 0,
+	0, -1, 0, 0, 0, 0, 0, MAX_PROXY_NUMBER, 0, 0, 0,
 	6, 600,
 	1048576,
 	NULL, NULL,

@@ -11,7 +11,7 @@
 #ifndef NOPSTDINT
 #include "pstdint.h"
 #else
-typedef unsigned long uint64_t
+//typedef unsigned long uint64_t
 #define PRINTF_INT64_MODIFIER "l"
 #endif
 #ifdef  __cplusplus
@@ -336,15 +336,116 @@ struct filterp {
 
 #define MAX_FILTERS 16
 
+#define CACHE_BUFSIZE 4096
+#define LINESIZE 2048
+
+#include "define.h"
+
+struct clientparam {
+	struct srvparam *srv;
+	REDIRECTFUNC redirectfunc;
+	BANDLIMFUNC bandlimfunc;
+	TRAFCOUNTFUNC trafcountfunc;
+
+	uv_work_t proxy_req;
+
+	uv_connect_t remote_connect_req;
+	uv_tcp_t remote_conn;
+	char remote_buf[CACHE_BUFSIZE];
+
+	uv_tcp_t local_conn;
+	char local_buf[CACHE_BUFSIZE];
+
+	struct filterp	*filters,
+		**reqfilters,
+		**hdrfilterscli, **hdrfilterssrv,
+		**predatfilters, **datfilterscli, **datfilterssrv;
+
+	PROXYSERVICE service;
+
+	SOCKET	clisock,
+		remsock,
+		ctrlsock,
+		ctrlsocksrv;
+
+	REDIRTYPE redirtype;
+
+	int	redirected,
+		operation,
+		nfilters, nreqfilters, nhdrfilterscli, nhdrfilterssrv, npredatfilters, ndatfilterscli, ndatfilterssrv,
+		unsafefilter;
+
+	int	res,
+		status;
+	uint64_t	waitclient64,
+		waitserver64;
+	int	pwtype,
+		threadid,
+		weight,
+		nolog,
+		nolongdatfilter,
+		nooverwritefilter,
+		transparent,
+		chunked;
+
+	unsigned char 	*hostname,
+		*username,
+		*password,
+		*extusername,
+		*extpassword,
+		*clibuf,
+		*srvbuf;
+
+	int 	cliinbuf,
+		srvinbuf,
+		clioffset,
+		srvoffset,
+		clibufsize,
+		srvbufsize,
+		msec_start;
+	uint64_t
+		maxtrafin64,
+		maxtrafout64;
+#ifndef NOIPV6
+	struct sockaddr_in6	sincl, sincr;
+#else
+	struct sockaddr_in	sincl, sincr;
+#endif
+	struct sockaddr_in	sins,
+		req;
+
+	uint64_t	statscli64,
+		statssrv64;
+	unsigned long
+		nreads,
+		nwrites,
+		nconnects,
+		extip;
+
+	struct bandlim	*bandlims[MAXBANDLIMS],
+		*bandlimsout[MAXBANDLIMS];
+
+	unsigned short extport;
+
+	time_t time_start;
+};
+
+typedef STL::fixed_hash_set<struct clientparam *, MAX_PROXY_NUMBER> CLIENT_LIST;
+typedef CLIENT_LIST::iterator CLIENT_ITER;
+typedef STL::pair<CLIENT_ITER, bool> CLIENT_PAIR;
+
+struct SERVER_GLOBAL
+{
+	CLIENT_LIST child_list;
+};
+
 struct srvparam {
-	struct srvparam *next;
-	struct srvparam *prev;
-	struct clientparam * child;
+	uv_loop_t * loop;
 	PROXYSERVICE service;
 	LOGFUNC logfunc;
 	AUTHFUNC authfunc;
 	PROXYFUNC pf;
-	SOCKET srvsock;
+	uv_tcp_t server;
 	int childcount;
 	int maxchild;
 	int version;
@@ -377,89 +478,6 @@ struct srvparam {
 	unsigned short extport;
 	unsigned short targetport;
 	unsigned char replace;
-	time_t time_start;
-};
-
-struct clientparam {
-	struct clientparam	*next,
-				*prev;
-	struct srvparam *srv;
-	REDIRECTFUNC redirectfunc;
-	BANDLIMFUNC bandlimfunc;
-	TRAFCOUNTFUNC trafcountfunc;
-
-
-	struct filterp	*filters,
-			**reqfilters,
-			**hdrfilterscli, **hdrfilterssrv,
-			**predatfilters, **datfilterscli, **datfilterssrv;
-
-	PROXYSERVICE service;
-
-	SOCKET	clisock,
-		remsock,
-		ctrlsock,
-		ctrlsocksrv;
-
-	REDIRTYPE redirtype;
-
-	int	redirected,
-		operation,
-		nfilters, nreqfilters, nhdrfilterscli, nhdrfilterssrv, npredatfilters, ndatfilterscli, ndatfilterssrv,
-		unsafefilter;
-
-	int	res,
-		status;
-	uint64_t	waitclient64,
-			waitserver64;
-	int	pwtype,
-		threadid,
-		weight,
-		nolog,
-		nolongdatfilter,
-		nooverwritefilter,
-		transparent,
-		chunked;
-
-	unsigned char 	*hostname,
-			*username,
-			*password,
-			*extusername,
-			*extpassword,
-			*clibuf,
-			*srvbuf;
-
-	int 	cliinbuf,
-			srvinbuf,
-			clioffset,
-			srvoffset,
-			clibufsize,
-			srvbufsize,
-			msec_start;
-	uint64_t
-			maxtrafin64,
-			maxtrafout64;
-#ifndef NOIPV6
-	struct sockaddr_in6	sincl, sincr;
-#else
-	struct sockaddr_in	sincl, sincr;
-#endif
-	struct sockaddr_in	sins,
-				req;
-
-	uint64_t	statscli64,
-			statssrv64;
-	unsigned long
-			nreads,
-			nwrites,
-			nconnects,
-			extip;
-
-	struct bandlim	*bandlims[MAXBANDLIMS],
-			*bandlimsout[MAXBANDLIMS];
-
-	unsigned short extport;
-
 	time_t time_start;
 };
 

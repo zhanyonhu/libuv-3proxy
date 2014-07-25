@@ -19,6 +19,58 @@
 #define MODULEMAINFUNC main
 #define STDMAIN
 
+struct SERVER_GLOBAL g_server;
+struct srvparam srv;
+struct clientparam defparam;
+struct client_list;
+
+int add_proxy_node(SOCKET new_sock)
+{
+	struct clientparam * newparam;
+	if (!(newparam = (struct clientparam *)myalloc(sizeof(defparam))))
+	{
+		if (!childdef.isudp) so._closesocket(new_sock);
+		defparam.res = 21;
+		if (!srv.silent)(*srv.logfunc)(&defparam, (unsigned char *)"Memory Allocation Failed");
+		usleep(SLEEPTIME);
+		return -1;
+	};
+
+	memcpy(newparam, &defparam, sizeof(defparam));
+	if (defparam.hostname)newparam->hostname = (unsigned char *)strdup((const char *)defparam.hostname);
+	clearstat(newparam);
+	if (!childdef.isudp) newparam->clisock = new_sock;
+#ifndef STDMAIN
+	if (makefilters(&srv, newparam) > CONTINUE)
+	{
+		freeparam(newparam);
+		continue;
+	}
+#endif
+
+	CLIENT_PAIR ppair = g_server.child_list.insert(newparam);
+	if (!ppair.second)
+	{
+		myfree(newparam);
+		if (!childdef.isudp) so._closesocket(new_sock);
+		defparam.res = 21;
+		if (!srv.silent)(*srv.logfunc)(&defparam, (unsigned char *)"Insert Client Node Failed");
+		usleep(SLEEPTIME);
+		return -1;
+	}
+
+	newparam->proxy_req.data = newparam;
+
+	newparam->remote_connect_req.data = newparam;
+	newparam->remote_conn.data = newparam;
+
+	newparam->local_conn.data = newparam;
+	uv_queue_work(srv.loop, &newparam->proxy_req, procy_cb, NULL);
+
+	srv.childcount++;
+	return 0;
+}
+
 #ifndef _WINCE
 
 int main (int argc, char** argv){
@@ -47,8 +99,6 @@ int MODULEMAINFUNC (int argc, char** argv){
  int i=0;
  SASIZETYPE size;
  pthread_t thread;
- struct clientparam defparam;
- struct srvparam srv;
  struct clientparam * newparam;
  int error = 0;
  unsigned sleeptime;
@@ -323,6 +373,16 @@ int MODULEMAINFUNC (int argc, char** argv){
 
 
 #endif
+ uv_tcp_init(srv.loop, &srv.server);
+
+ struct sockaddr_in bind_addr = uv_ip4_addr("0.0.0.0", 7000);
+ uv_tcp_bind(&server, bind_addr);
+ int r = uv_listen((uv_stream_t*)&server, 128, on_new_connection);
+ if (r) {
+	 fprintf(stderr, "Listen error %s\n", uv_err_name(uv_last_error(loop)));
+	 return 1;
+ }
+ return uv_run(loop, UV_RUN_DEFAULT);
 
  if(srv.srvsock == INVALID_SOCKET){
 
@@ -438,58 +498,12 @@ int MODULEMAINFUNC (int argc, char** argv){
 	}
 	else 
 		srv.fds.events = 0;
-	if (!(newparam = (struct clientparam *)myalloc(sizeof(defparam)))){
-		if(!isudp) so._closesocket(new_sock);
-		defparam.res = 21;
-		if(!srv.silent)(*srv.logfunc)(&defparam, (unsigned char *)"Memory Allocation Failed");
-		usleep(SLEEPTIME);
-		continue;
-	};
-	memcpy(newparam, &defparam, sizeof(defparam));
-	if (defparam.hostname)newparam->hostname = (unsigned char *)strdup((const char *)defparam.hostname);
-	clearstat(newparam);
-	if(!isudp) newparam->clisock = new_sock;
-#ifndef STDMAIN
-	if(makefilters(&srv, newparam) > CONTINUE){
-		freeparam(newparam);		
+
+	if (add_proxy_node(new_sock) < 0)
+	{
 		continue;
 	}
-#endif
-	newparam->prev = newparam->next = NULL;
-	pthread_mutex_lock(&srv.counter_mutex);
-	if(!srv.child){
-		srv.child = newparam;
-	}
-	else {
-		newparam->next = srv.child;
-		srv.child = srv.child->prev = newparam;
-	}
-#ifdef _WIN32
-#ifndef _WINCE
-	h = (HANDLE)_beginthreadex((LPSECURITY_ATTRIBUTES )NULL, (unsigned)16384, (BEGINTHREADFUNC)srv.pf, (void *) newparam, 0, &thread);
-#else
-	h = (HANDLE)CreateThread((LPSECURITY_ATTRIBUTES )NULL, (unsigned)32768, (BEGINTHREADFUNC)srv.pf, (void *) newparam, 0, &thread);
-#endif
-	newparam->threadid = (unsigned)thread;
-	if (h) {
-		srv.childcount++;
-		CloseHandle(h);
-	}
-	else {
-		myfree(newparam);
-	}
-#else
-	if((error = pthread_create(&thread, &pa, (PTHREADFUNC)srv.pf, (void *)newparam))){
-		sprintf((char *)buf, "pthread_create(): %s", strerror(error));
-		if(!srv.silent)(*srv.logfunc)(&defparam, buf);
-		freeparam(newparam);
-	}
-	else {
-		srv.childcount++;
-		newparam->threadid = (unsigned)thread;
-	}
-#endif
-	pthread_mutex_unlock(&srv.counter_mutex);
+
 	memset(&defparam.sincl, 0, sizeof(defparam.sincl));
 	memset(&defparam.sincr, 0, sizeof(defparam.sincr));
 	if(isudp) while(!srv.fds.events)usleep(SLEEPTIME);
@@ -531,6 +545,12 @@ void srvinit(struct srvparam * srv, struct clientparam *param){
  *SAFAMILY(&param->req) = *SAFAMILY(&param->sins) = *SAFAMILY(&param->sincr) = *SAFAMILY(&param->sincl) = AF_INET;
  pthread_mutex_init(&srv->counter_mutex, NULL);
  memcpy(&srv->intsa, &conf.intsa, sizeof(srv->intsa));
+
+#if defined _DEBUG || defined DEBUG
+ srv->logfunc = logstdout;
+#endif // _DEBUG
+
+ srv->loop = uv_default_loop();
 }
 
 void srvinit2(struct srvparam * srv, struct clientparam *param){
@@ -597,18 +617,8 @@ void freeparam(struct clientparam * param) {
 #endif
 	if(param->clibuf) myfree(param->clibuf);
 	if(param->srvbuf) myfree(param->srvbuf);
-	if(param->srv){
-		pthread_mutex_lock(&param->srv->counter_mutex);
-		if(param->prev){
-			param->prev->next = param->next;
-		}
-		else
-			param->srv->child = param->next;
-		if(param->next){
-			param->next->prev = param->prev;
-		}
-		(param->srv->childcount)--;
-		pthread_mutex_unlock(&param->srv->counter_mutex);
+	if(param->srv)
+	{
 	}
 	if(param->hostname) myfree(param->hostname);
 	if(param->username) myfree(param->username);

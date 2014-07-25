@@ -15,6 +15,7 @@
 
 #ifndef _3PROXY_H_
 #define _3PROXY_H_
+#include "define.h"
 #include "version.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -78,8 +79,12 @@
 #undef errno
 #endif
 #define errno WSAGetLastError()
+#ifndef EAGAIN
 #define EAGAIN WSAEWOULDBLOCK
+#endif
+#ifndef EINTR
 #define EINTR WSAEWOULDBLOCK
+#endif
 #define SLEEPTIME 1
 #define usleep Sleep
 #define pthread_self GetCurrentThreadId
@@ -145,6 +150,8 @@ extern time_t basetime;
 extern int timetoexit;
 
 extern struct extparam conf;
+
+void procy_cb(uv_work_t* req);
 
 int sockmap(struct clientparam * param, int timeo);
 int socksend(SOCKET sock, unsigned char * buf, int bufsize, int to);
@@ -286,7 +293,6 @@ extern char *copyright;
 void * dnsprchild(struct clientparam * param);
 void * pop3pchild(struct clientparam * param);
 void * smtppchild(struct clientparam * param);
-void * proxychild(struct clientparam * param);
 void * sockschild(struct clientparam * param);
 void * tcppmchild(struct clientparam * param);
 void * icqprchild(struct clientparam * param);
