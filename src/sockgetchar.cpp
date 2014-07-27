@@ -71,64 +71,13 @@ int sockrecvfrom(SOCKET sock, struct sockaddr * sin, unsigned char * buf, int bu
 	return res;
 }
 
-int sockgetcharcli(struct clientparam * param, int timeosec, int timeousec){
-	int len;
-
-	if(!param->clibuf){
-		if (!(param->clibuf = (unsigned char *)myalloc(BUFSIZE))) return 0;
-		param->clibufsize = BUFSIZE;
-		param->clioffset = param->cliinbuf = 0;
+int sockgetcharcli(struct clientparam * param, int timeosec, int timeousec)
+{
+	if (param->cliinbuf && param->clioffset < param->cliinbuf)
+	{
+		return (int)param->local_buf[param->clioffset++];
 	}
-	if(param->cliinbuf && param->clioffset < param->cliinbuf){
-		return (int)param->clibuf[param->clioffset++];
-	}
-	param->clioffset = param->cliinbuf = 0;
-	if ((len = sockrecvfrom(param->clisock, (struct sockaddr *)&param->sincr, param->clibuf, param->clibufsize, timeosec*1000 + timeousec))<=0) return EOF;
-	param->cliinbuf = len;
-	param->clioffset = 1;
-	return (int)*param->clibuf;
-}
-
-int sockfillbuffcli(struct clientparam * param, unsigned long size, int timeosec){
-	int len;
-
-	if(!param->clibuf) return 0;
-	if(param->cliinbuf == param->clioffset){
-		param->cliinbuf = param->clioffset = 0;
-	}
-	else if(param->clioffset){
-		memmove(param->clibuf, param->clibuf + param->clioffset, param->cliinbuf - param->clioffset);
-		param->cliinbuf -= param->clioffset;
-		param->clioffset = 0;
-	}
-	if(size <= param->cliinbuf) return size;
-	size -= param->cliinbuf;
-	if((len = sockrecvfrom(param->clisock, (struct sockaddr *)&param->sincr, param->clibuf + param->cliinbuf, (param->clibufsize - param->cliinbuf) < size? param->clibufsize - param->cliinbuf:size, timeosec*1000)) > 0){
-		param->cliinbuf += len;
-	}
-	return param->cliinbuf;
-}
-
-int sockfillbuffsrv(struct clientparam * param, unsigned long size, int timeosec){
-	int len;
-
-	if(!param->srvbuf) return 0;
-	if(param->srvinbuf == param->srvoffset){
-		param->srvinbuf = param->srvoffset = 0;
-	}
-	else if(param->srvoffset){
-		memmove(param->srvbuf, param->srvbuf + param->srvoffset, param->srvinbuf - param->srvoffset);
-		param->srvinbuf -= param->srvoffset;
-		param->srvoffset = 0;
-	}
-	if(size <= param->srvinbuf) return size;
-	size -= param->srvinbuf;
-	if((len = sockrecvfrom(param->remsock, (struct sockaddr *)&param->sins, param->srvbuf + param->srvinbuf, (param->srvbufsize - param->srvinbuf) < size? param->srvbufsize - param->srvinbuf:size, timeosec*1000)) > 0){
-		param->srvinbuf += len;
-		param->nreads++;
-		param->statssrv64 += len;
-	}
-	return param->srvinbuf;
+	return (int)*param->local_buf;
 }
 
 
@@ -148,7 +97,7 @@ int sockgetcharsrv(struct clientparam * param, int timeosec, int timeousec){
 		return (int)param->srvbuf[param->srvoffset++];
 	}
 	param->srvoffset = param->srvinbuf = 0;
-	if ((len = sockrecvfrom(param->remsock, (struct sockaddr *)&param->sins, param->srvbuf, param->srvbufsize, timeosec*1000 + timeousec))<=0) return EOF;
+	if ((len = sockrecvfrom(param->remote_conn.socket, (struct sockaddr *)&param->sins, param->srvbuf, param->srvbufsize, timeosec * 1000 + timeousec)) <= 0) return EOF;
 	param->srvinbuf = len;
 	param->srvoffset = 1;
 	param->nreads++;
@@ -165,9 +114,9 @@ int sockgetlinebuf(struct clientparam * param, DIRECTION which, char * buf, int 
 	return 0;
  }
  do {
-	buf[i++] = c;
-	if(delim != EOF && c == delim) break;
- }while(i < bufsize && (c = (which)?sockgetcharsrv(param, to, 0):sockgetcharcli(param, to, 0)) != EOF);
+	 buf[i++] = c;
+	 if (delim != EOF && c == delim) break;
+ } while (i < bufsize && (c = (which) ? sockgetcharsrv(param, to, 0) : sockgetcharcli(param, to, 0)) != EOF);
  return i;
 }
 

@@ -269,7 +269,7 @@ int parseconnusername(char *username, struct clientparam *param, int extpasswd, 
 	char *sb, *se;
 	if(!username || !*username) return 1;
         if ((sb=strchr(username, conf.delimchar)) == NULL){
-		if(!param->hostname && param->remsock == INVALID_SOCKET) return 2;
+		if(!param->hostname && param->remote_conn.socket == INVALID_SOCKET) return 2;
 		return parseusername(username, param, extpasswd);
 	}
 	while ((se=strchr(sb+1, conf.delimchar)))sb=se;
@@ -592,54 +592,50 @@ void logsyslog(struct clientparam * param, const unsigned char *s) {
 }
 #endif
 
+void on_connect(uv_connect_t* req, int status);
 int doconnect(struct clientparam * param){
  SASIZETYPE size = sizeof(param->sins);
  struct sockaddr_in bindsa;
  if (param->operation == ADMIN || param->operation == DNSRESOLVE || param->operation == BIND || param->operation == UDPASSOC)
 	return 0;
- if (param->remsock != INVALID_SOCKET){
-	if(so._getpeername(param->remsock, (struct sockaddr *)&param->sins, &size)==-1) {return (15);}
+ if (param->remote_conn.socket != INVALID_SOCKET){
+	 if (so._getpeername(param->remote_conn.socket, (struct sockaddr *)&param->sins, &size) == -1) { return (15); }
  }
  else {
-	struct linger lg;
+	 if (!param->sins.sin_addr.s_addr)
+		 if (!(param->sins.sin_addr.s_addr = param->req.sin_addr.s_addr)) return 100;
+	 if (!param->sins.sin_port)param->sins.sin_port = param->req.sin_port;
 
-	if(!param->sins.sin_addr.s_addr)
-		if(!(param->sins.sin_addr.s_addr = param->req.sin_addr.s_addr)) return 100;
-	if(!param->sins.sin_port)param->sins.sin_port = param->req.sin_port;
-	if ((param->remsock=so._socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET) {return (11);}
-	so._setsockopt(param->remsock, SOL_SOCKET, SO_LINGER, (char *)&lg, sizeof(lg));
-	memset(&bindsa, 0, sizeof(bindsa));
-	bindsa.sin_family = AF_INET;
-	bindsa.sin_port = param->extport;
-	bindsa.sin_addr.s_addr = param->extip;
-	if (param->srv->targetport && !bindsa.sin_port && ntohs(*SAPORT(&param->sincr)) > 1023) bindsa.sin_port = *SAPORT(&param->sincr);
-	if(so._bind(param->remsock, (struct sockaddr*)&bindsa, sizeof(bindsa))==-1) {
-		memset(&bindsa, 0, sizeof(bindsa));
-		bindsa.sin_family = AF_INET;
-		bindsa.sin_addr.s_addr = param->extip;
-		bindsa.sin_port = 0;
-		if(so._bind(param->remsock, (struct sockaddr*)&bindsa, sizeof(bindsa))==-1) {
-			return 12;
-		}
-	}
-	
-	param->sins.sin_family = AF_INET;
-	if(param->operation >= 256 || (param->operation & CONNECT)){
-#ifdef _WIN32
-		unsigned long ul = 1;
-#endif
-		if(so._connect(param->remsock,(struct sockaddr *)&param->sins,sizeof(param->sins))) {return (13);}
-		param->nconnects++;
-#ifdef _WIN32
-		ioctlsocket(param->remsock, FIONBIO, &ul);
-#else
-		fcntl(param->remsock,F_SETFL,O_NONBLOCK);
-#endif
-		if(so._getsockname(param->remsock, (struct sockaddr *)&bindsa, &size)==-1) {return (15);}
-		param->extip = bindsa.sin_addr.s_addr;
-	}
-	else {
-		if(so._getsockname(param->remsock, (struct sockaddr *)&param->sins, &size)==-1) {return (15);}
+	 param->sins.sin_family = AF_INET;
+
+//	 struct linger lg;
+// 	 SASIZETYPE size = sizeof(param->sins);
+// 	 so._setsockopt(param->remote_conn.socket, SOL_SOCKET, SO_LINGER, (char *)&lg, sizeof(lg));
+// 	 struct sockaddr_in bindsa;
+// 	 memset(&bindsa, 0, sizeof(bindsa));
+// 	 bindsa.sin_family = AF_INET;
+// 	 bindsa.sin_port = param->extport;
+// 	 bindsa.sin_addr.s_addr = param->extip;
+// 	 if (param->srv->targetport && !bindsa.sin_port && ntohs(*SAPORT(&param->sincr)) > 1023) bindsa.sin_port = *SAPORT(&param->sincr);
+// 	 if (so._bind(param->remote_conn.socket, (struct sockaddr*)&bindsa, sizeof(bindsa)) == -1)
+// 	 {
+// 		 memset(&bindsa, 0, sizeof(bindsa));
+// 		 bindsa.sin_family = AF_INET;
+// 		 bindsa.sin_addr.s_addr = param->extip;
+// 		 bindsa.sin_port = 0;
+// 		 if (so._bind(param->remote_conn.socket, (struct sockaddr*)&bindsa, sizeof(bindsa)) == -1)
+// 		 {
+// 			 return (12);
+// 		 }
+// 	 }
+
+	int r = uv_tcp_connect(&param->remote_connect_req,
+		&param->remote_conn,
+		(const struct sockaddr*) &param->sins,
+		on_connect);
+	if (r!=0)
+	{
+		return (11);
 	}
  }
  return 0;

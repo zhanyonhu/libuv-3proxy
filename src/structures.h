@@ -341,6 +341,12 @@ struct filterp {
 
 #include "define.h"
 
+enum CLIENT_STEP
+{
+	CLIENT_STEP_NONE,
+	CLIENT_STEP_CONNECTING,
+};
+
 struct clientparam {
 	struct srvparam *srv;
 	REDIRECTFUNC redirectfunc;
@@ -351,10 +357,26 @@ struct clientparam {
 
 	uv_connect_t remote_connect_req;
 	uv_tcp_t remote_conn;
+	uv_write_t remote_write_req;
+	uv_shutdown_t remote_shutdown_req;
 	char remote_buf[CACHE_BUFSIZE];
+	char buf[CACHE_BUFSIZE];
 
 	uv_tcp_t local_conn;
+	uv_write_t local_write_req;
+	uv_shutdown_t local_shutdown_req;
 	char local_buf[CACHE_BUFSIZE];
+
+	CLIENT_STEP step;
+
+	int keepalive;
+	int ckeepalive;
+	char * reqbuf;
+	int isconnect;
+	int ftp;
+	int inbuf;
+	char * newbuf;
+	uint64_t contentlength64;
 
 	struct filterp	*filters,
 		**reqfilters,
@@ -363,9 +385,7 @@ struct clientparam {
 
 	PROXYSERVICE service;
 
-	SOCKET	clisock,
-		remsock,
-		ctrlsock,
+	SOCKET	ctrlsock,
 		ctrlsocksrv;
 
 	REDIRTYPE redirtype;
@@ -393,7 +413,6 @@ struct clientparam {
 		*password,
 		*extusername,
 		*extpassword,
-		*clibuf,
 		*srvbuf;
 
 	int 	cliinbuf,
@@ -463,8 +482,6 @@ struct srvparam {
 	struct sockaddr_in intsa;
 #endif
 	unsigned long extip;
-	pthread_mutex_t counter_mutex;
-	struct pollfd fds;
 	FILE *stdlog;
 	unsigned char * target;
 	struct auth *authenticate;

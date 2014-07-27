@@ -172,7 +172,6 @@
     <ClCompile Include="..\..\src\myalloc.cpp" />
     <ClCompile Include="..\..\src\proxy.cpp" />
     <ClCompile Include="..\..\src\sockgetchar.cpp" />
-    <ClCompile Include="..\..\src\sockmap.cpp" />
     <ClCompile Include="..\..\src\stringtable.c" />
   </ItemGroup>
   <ItemGroup>

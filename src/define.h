@@ -12,7 +12,7 @@
 #define EASTL_API
 #define EASTL_TEMPLATE_API
 #endif	//_DEBUG
-
+#define _SSIZE_T_DEFINED
 #define STL				eastl
 #include "EASTL/fixed_hash_set.h"
 typedef eastl_size_t	stl_size_t;
@@ -93,6 +93,7 @@ typedef size_t			stl_size_t;
 #define VERIFY(expr)		expr
 #endif	/* _DEBUG*/
 
-#define LOG_ERR			logerr
+#define LOG_CLIENT_ERR			logclienterr
+#define LOG_ERR					if (!srv.silent)logerr
 
 #endif	//_DEFINE_H_

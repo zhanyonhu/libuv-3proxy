@@ -28,9 +28,6 @@
     <ClCompile Include="..\..\src\sockgetchar.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\sockmap.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\stringtable.c">
       <Filter>src</Filter>
     </ClCompile>

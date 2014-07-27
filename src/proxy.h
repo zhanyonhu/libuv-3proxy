@@ -153,7 +153,6 @@ extern struct extparam conf;
 
 void procy_cb(uv_work_t* req);
 
-int sockmap(struct clientparam * param, int timeo);
 int socksend(SOCKET sock, unsigned char * buf, int bufsize, int to);
 int socksendto(SOCKET sock, struct sockaddr * sin, unsigned char * buf, int bufsize, int to);
 int sockrecvfrom(SOCKET sock, struct sockaddr * sin, unsigned char * buf, int bufsize, int to);
