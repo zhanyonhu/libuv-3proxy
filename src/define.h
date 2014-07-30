@@ -95,5 +95,10 @@ typedef size_t			stl_size_t;
 
 #define LOG_CLIENT_ERR			logclienterr
 #define LOG_ERR					if (!srv.silent)logerr
+#ifdef _DEBUG
+#define DEBUG_LOG				logerr
+#else
+#define DEBUG_LOG				
+#endif
 
 #endif	//_DEFINE_H_

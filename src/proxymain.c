@@ -169,7 +169,6 @@ int MODULEMAINFUNC (int argc, char** argv){
 	" -t be silent (do not log service start/stop)\n"
 	" -iIP ip address or internal interface (clients are expected to connect)\n"
 	" -eIP ip address or external interface (outgoing connection will have this)\n";
-
 	#ifdef _WIN32
 	unsigned long ul = 1;
 	#else

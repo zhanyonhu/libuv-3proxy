@@ -592,7 +592,7 @@ void logsyslog(struct clientparam * param, const unsigned char *s) {
 }
 #endif
 
-void on_connect(uv_connect_t* req, int status);
+void on_remote_connect(uv_connect_t* req, int status);
 int doconnect(struct clientparam * param){
  SASIZETYPE size = sizeof(param->sins);
  struct sockaddr_in bindsa;
@@ -632,7 +632,7 @@ int doconnect(struct clientparam * param){
 	int r = uv_tcp_connect(&param->remote_connect_req,
 		&param->remote_conn,
 		(const struct sockaddr*) &param->sins,
-		on_connect);
+		on_remote_connect);
 	if (r!=0)
 	{
 		return (11);

@@ -153,17 +153,24 @@ int do_local_write(struct clientparam * pclient, unsigned char * buf, int buflen
 int do_remote_write(struct clientparam * pclient, const uv_buf_t * bufs, unsigned int nbufs);
 
 int onrecv_clientrequest(struct clientparam * pclient);
+int on_serverconnected(struct clientparam * pclient);
 
 static void logclienterr(struct clientparam * param, char * format, ...)
 {
 	fprintf(stderr, "%p>>", param);
-	fprintf(stderr, format);
+	va_list argptr;
+	va_start(argptr, format);
+	vfprintf(stderr, format, argptr);
+	va_end(argptr);
 	fflush(stderr);
 }
 
 static void logerr(char * format, ...)
 {
-	fprintf(stderr, format);
+	va_list argptr;
+	va_start(argptr, format);
+	vfprintf(stderr, format, argptr);
+	va_end(argptr);
 	fflush(stderr);
 }
 
@@ -278,6 +285,9 @@ static void remote_close_cb(uv_handle_t* handle)
 
 void do_close(struct clientparam * pclient)
 {
+	uv_read_stop((uv_stream_t*)&pclient->local_conn);
+	uv_read_stop((uv_stream_t*)&pclient->remote_conn);
+
 	uv_shutdown((uv_shutdown_t*)&pclient->local_shutdown_req, (uv_stream_t*)&pclient->local_conn, NULL);
 	uv_shutdown((uv_shutdown_t*)&pclient->remote_shutdown_req, (uv_stream_t*)&pclient->remote_conn, NULL);
 
@@ -305,7 +315,7 @@ static void local_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* rb
 	{
 		LOG_CLIENT_ERR(pclient, "local_read_cb error: %s\n", uv_err_name((int)nread));
 		ASSERT(nread == UV_ECONNRESET || nread == UV_EOF);
-
+		
 		do_close(pclient);
 		return;
 	}
@@ -375,14 +385,17 @@ static void remote_read_cb(uv_stream_t* stream, ssize_t nread, const uv_buf_t* r
 
 	pclient->srvinbuf += nread;
 
-// 	switch (pclient->step)
-// 	{
-// 	case CLIENT_STEP_CONNECTING:
-// 		onrecv_clientrequest(pclient);
-// 		break;
-// 	default:
-// 		break;
-// 	}
+	DEBUG_LOG("proxy=%d\n", nread);
+
+	switch (pclient->step)
+	{
+	case CLIENT_STEP_CONNECTED:
+		do_local_write(pclient, rbuf, 1);
+		pclient->srvinbuf = pclient->srvoffset = 0;
+		break;
+	default:
+		break;
+	}
 }
 
 static void local_write_cb(uv_write_t* req, int status)
@@ -414,8 +427,7 @@ int do_remote_read(struct clientparam * pclient)
 int do_local_write(struct clientparam * pclient, const uv_buf_t * bufs, unsigned int nbufs)
 {
 	int r = 0;
-	uv_write_t req;
-	r = uv_write((uv_write_t *)&req, (uv_stream_t*)&pclient->local_conn, bufs, nbufs, local_write_cb);
+	r = uv_write((uv_write_t *)&pclient->local_write_req, (uv_stream_t*)&pclient->local_conn, bufs, nbufs, local_write_cb);
 	ASSERT(r == 0);
 	return r;
 }
@@ -423,11 +435,10 @@ int do_local_write(struct clientparam * pclient, const uv_buf_t * bufs, unsigned
 int do_local_write(struct clientparam * pclient, unsigned char * buf, int buflen)
 {
 	int r = 0;
-	uv_write_t req;
 	uv_buf_t bufs;
 	bufs.base = (char *)buf;
 	bufs.len = buflen;
-	r = uv_write((uv_write_t *)&req, (uv_stream_t*)&pclient->local_conn, &bufs, 1, local_write_cb);
+	r = uv_write((uv_write_t *)&pclient->local_write_req, (uv_stream_t*)&pclient->local_conn, &bufs, 1, local_write_cb);
 	ASSERT(r == 0);
 	return r;
 }
@@ -435,8 +446,18 @@ int do_local_write(struct clientparam * pclient, unsigned char * buf, int buflen
 int do_remote_write(struct clientparam * pclient, const uv_buf_t * bufs, unsigned int nbufs)
 {
 	int r = 0;
-	uv_write_t req;
-	r = uv_write((uv_write_t *)&pclient->remote_connect_req, (uv_stream_t*)&pclient->remote_conn, bufs, nbufs, remote_write_cb);
+	r = uv_write((uv_write_t *)&pclient->remote_write_req, (uv_stream_t*)&pclient->remote_conn, bufs, nbufs, remote_write_cb);
+	ASSERT(r == 0);
+	return r;
+}
+
+int do_remote_write(struct clientparam * pclient, unsigned char * buf, int buflen)
+{
+	int r = 0;
+	uv_buf_t bufs;
+	bufs.base = (char *)buf;
+	bufs.len = buflen;
+	r = uv_write((uv_write_t *)&pclient->remote_write_req, (uv_stream_t*)&pclient->remote_conn, &bufs, 1, remote_write_cb);
 	ASSERT(r == 0);
 	return r;
 }
@@ -449,7 +470,7 @@ void procy_cb(uv_work_t* req)
 	do_local_read(pclient);
 }
 
-void on_connect(uv_connect_t* req, int status)
+void on_remote_connect(uv_connect_t* req, int status)
 {
 	ASSERT(req != NULL);
 
@@ -520,7 +541,353 @@ void on_connect(uv_connect_t* req, int status)
 		}
 	}
 
-	do_remote_read(pclient);
+	pclient->step = CLIENT_STEP_CONNECTED;
+	if (on_serverconnected(pclient) == 0)
+	{
+		do_remote_read(pclient);
+	}
+}
+
+int on_serverconnected(struct clientparam * pclient)
+{
+	struct clientparam * param = pclient;
+	SASIZETYPE sasize;
+	int & ftp = pclient->ftp;
+	int & ckeepalive = pclient->ckeepalive;
+	int & isconnect = pclient->isconnect;
+	int res = 0;
+	int redirect = 0;
+	char *& req = pclient->reqbuf;
+	int reqlen = 0;
+	int & inbuf = pclient->inbuf;
+	int anonymous = param->srv->singlepacket;
+	char * buf = pclient->buf;
+	int & keepalive = pclient->keepalive;
+	unsigned char username[1024];
+
+	if (*SAFAMILY(&param->srv->intsa) == AF_INET &&
+		(param->sins.sin_addr.s_addr == ((struct sockaddr_in *)&param->srv->intsa)->sin_addr.s_addr && param->sins.sin_port == *SAPORT(&param->srv->intsa))) {
+		RETURN(519);
+	}
+	sasize = sizeof(struct sockaddr_in);
+	if (so._getpeername(param->remote_conn.socket, (struct sockaddr *)&param->sins, &sasize))
+	{
+		RETURN(520);
+	}
+#define FTPBUFSIZE 1536
+
+/*	if (ftp && param->redirtype != R_HTTP)
+	{
+		SOCKET s;
+		int mode = 0;
+		int i = 0;
+		char ftpbuf[FTPBUFSIZE];
+		int inftpbuf = 0;
+
+		if (!ckeepalive)
+		{
+			inftpbuf = FTPBUFSIZE - 20;
+			res = ftplogin(param, ftpbuf, &inftpbuf);
+			if (res)
+			{
+				if (res == 700 || res == 701)
+				{
+					socksend(param->clisock, (unsigned char *)proxy_stringtable[16], (int)strlen(proxy_stringtable[16]), conf.timeouts[STRING_S]);
+					socksend(param->clisock, (unsigned char *)ftpbuf, inftpbuf, conf.timeouts[STRING_S]);
+				}
+				RETURN(res);
+			}
+		}
+		ckeepalive = 1;
+		if (ftpbase) myfree(ftpbase);
+		ftpbase = NULL;
+		if (!(sp = strchr((char *)ss, ' '))){ RETURN(799); }
+		*sp = 0;
+
+		decodeurl(ss, 0);
+		i = (int)strlen((char *)ss);
+		if (!(ftpbase = (unsigned char *)myalloc(i + 2))){ RETURN(21); }
+		memcpy(ftpbase, ss, i);
+		if (ftpbase[i - 1] != '/') ftpbase[i++] = '/';
+		ftpbase[i] = 0;
+		memcpy(buf, "<pre><hr>\n", 10);
+		inbuf = 10;
+		if (inftpbuf) {
+			memcpy(buf + inbuf, ftpbuf, inftpbuf);
+			inbuf += inftpbuf;
+			memcpy(buf + inbuf, "<hr>", 4);
+			inbuf += 4;
+		}
+		if (ftpbase[1] != 0){
+			memcpy(buf + inbuf, "[<A HREF=\"..\">..</A>]\n", 22);
+			inbuf += 22;
+		}
+		inftpbuf = FTPBUFSIZE - (20 + inftpbuf);
+		res = ftpcd(param, ftpbase, ftpbuf, &inftpbuf);
+		if (res){
+			res = ftptype(param, (unsigned char *)"I");
+			if (res)RETURN(res);
+			ftpbase[--i] = 0;
+			ftps = ftpcommand(param, param->operation == FTP_PUT ? (unsigned char *)"PUT" : (unsigned char *)"RETR", ftpbase);
+		}
+		else {
+			if (inftpbuf){
+				memcpy(buf + inbuf, ftpbuf, inftpbuf);
+				inbuf += inftpbuf;
+				memcpy(buf + inbuf, "<hr>", 4);
+				inbuf += 4;
+			}
+			ftps = ftpcommand(param, (unsigned char *)"LIST", NULL);
+			mode = 1;
+		}
+		if (ftps == INVALID_SOCKET){ RETURN(780); }
+		if (!mode){
+			socksend(param->clisock, (unsigned char *)proxy_stringtable[8], (int)strlen(proxy_stringtable[8]), conf.timeouts[STRING_S]);
+			s = param->remsock;
+			param->remsock = ftps;
+			if ((param->operation == FTP_PUT) && (contentlength64 > 0)) param->waitclient64 = contentlength64;
+			res = sockmap(param, conf.timeouts[CONNECTION_L]);
+			if (res == 99) res = 0;
+			so._closesocket(ftps);
+			ftps = INVALID_SOCKET;
+			param->remsock = s;
+		}
+		else {
+			int headsent = 0;
+			int gotres = -1;
+
+			s = param->remsock;
+			if (param->srvoffset < param->srvinbuf){
+				gotres = ftpres(param, (unsigned char *)buf + inbuf, bufsize - (inbuf + 100));
+				if (gotres) inbuf = (int)strlen((char *)buf);
+			}
+
+			param->remsock = ftps;
+			if (gotres <= 0) for (; (res = sockgetlinebuf(param, SERVER, ftpbuf, FTPBUFSIZE - 20, '\n', conf.timeouts[STRING_S])) > 0; i++){
+				int isdir = 0;
+				int islink = 0;
+				int filetoken = -1;
+				int sizetoken = -1;
+				int modetoken = -1;
+				int datetoken = -1;
+				int spaces = 1;
+				char * tokens[10];
+				unsigned wordlen[10];
+				unsigned char j = 0;
+				int space = 1;
+
+				ftpbuf[res] = 0;
+				if (!i && ftpbuf[0] == 't' && ftpbuf[1] == 'o' && ftpbuf[2] == 't'){
+					mode = 2;
+					continue;
+				}
+				if (!isnumber(*ftpbuf) && mode == 1) mode = 2;
+				for (sb = ftpbuf; *sb; sb++){
+					if (!space && isspace(*sb)){
+						space = 1;
+						wordlen[j] = (unsigned)(sb - tokens[j]);
+						j++;
+					}
+					if (space && !isspace(*sb)){
+						space = 0;
+						tokens[j] = sb;
+						if (j == 8)break;
+					}
+				}
+				if (mode == 1){
+					if (j < 4) continue;
+					if (!(isdir = !memcmp(tokens[2], "<DIR>", wordlen[2])) && !isnumber(*tokens[2])){
+						continue;
+					}
+					datetoken = 0;
+					wordlen[datetoken] = ((unsigned)(tokens[1] - tokens[0])) + wordlen[1];
+					sizetoken = 2;
+					filetoken = 3;
+					spaces = 10;
+				}
+				else {
+					if (j < 8 || wordlen[0] != 10) continue;
+					if (j < 8 || !isnumber(*tokens[4])) mode = 3;
+					if (*tokens[0] == 'd') isdir = 1;
+					if (*tokens[0] == 'l') islink = 1;
+					modetoken = 0;
+					sizetoken = (mode == 2) ? 4 : 3;
+					filetoken = (mode == 2) ? 8 : 7;
+					datetoken = (mode == 2) ? 5 : 4;
+					tokens[filetoken] = tokens[filetoken - 1];
+					while (*tokens[filetoken] && !isspace(*tokens[filetoken]))tokens[filetoken]++;
+					if (*tokens[filetoken]){
+						tokens[filetoken]++;
+					}
+					wordlen[datetoken] = (unsigned)(tokens[filetoken] - tokens[datetoken]);
+					wordlen[filetoken] = (unsigned)strlen((char *)tokens[filetoken]);
+				}
+
+				if (modetoken >= 0) memcpy(buf + inbuf, tokens[modetoken], 11);
+				else memcpy(buf + inbuf, "---------- ", 11);
+				inbuf += 11;
+				if ((int)wordlen[datetoken] + 256 > bufsize - inbuf) continue;
+				memcpy(buf + inbuf, tokens[datetoken], wordlen[datetoken]);
+				inbuf += wordlen[datetoken];
+				if (isdir){
+					memcpy(buf + inbuf, "       DIR", 10);
+					inbuf += 10;
+				}
+				else if (islink){
+					memcpy(buf + inbuf, "      LINK", 10);
+					inbuf += 10;
+				}
+				else{
+					unsigned k;
+					if (wordlen[sizetoken] > 10) wordlen[sizetoken] = 10;
+					for (k = 10; k > wordlen[sizetoken]; k--){
+						buf[inbuf++] = ' ';
+					}
+					memcpy(buf + inbuf, tokens[sizetoken], wordlen[sizetoken]);
+					inbuf += wordlen[sizetoken];
+				}
+				memcpy(buf + inbuf, " <A HREF=\"", 10);
+				inbuf += 10;
+				sb = NULL;
+				if (islink) sb = strstr((char *)tokens[filetoken], " -> ");
+				if (sb) sb += 4;
+
+				else sb = (char *)tokens[filetoken];
+				if (*sb != '/' && ftpbase)file2url(ftpbase, (unsigned char *)buf, bufsize, (int *)&inbuf, 1);
+				file2url((unsigned char *)sb, (unsigned char *)buf, bufsize, (int *)&inbuf, 0);
+
+				if (isdir)buf[inbuf++] = '/';
+				memcpy(buf + inbuf, "\">", 2);
+				inbuf += 2;
+				for (sb = tokens[filetoken]; *sb; sb++){
+					if ((bufsize - inbuf) < 16)break;
+					if (*sb == '<'){
+						memcpy(buf + inbuf, "&lt;", 4);
+						inbuf += 4;
+					}
+					else if (*sb == '>'){
+						memcpy(buf + inbuf, "&gt;", 4);
+						inbuf += 4;
+					}
+					else if (*sb == '\r' || *sb == '\n'){
+						continue;
+					}
+					else if (islink && sb[0] == ' ' && sb[1] == '-'
+						&& sb[2] == '>'){
+						memcpy(buf + inbuf, "</A> ", 5);
+						inbuf += 5;
+					}
+					else buf[inbuf++] = *sb;
+				}
+				if (islink != 2){
+					memcpy(buf + inbuf, "</A>", 4);
+					inbuf += 4;
+				}
+				buf[inbuf++] = '\n';
+
+				if ((bufsize - inbuf) < LINESIZE){
+					if (bufsize > 20000){
+						if (!headsent++){
+							socksend(param->clisock, (unsigned char *)proxy_stringtable[9], (int)strlen(proxy_stringtable[9]), conf.timeouts[STRING_S]);
+						}
+						if ((unsigned)socksend(param->clisock, (unsigned char *)buf, inbuf, conf.timeouts[STRING_S]) != inbuf){
+							RETURN(781);
+						}
+						inbuf = 0;
+					}
+					else {
+						if (!(newbuf = (char *)myrealloc(buf, bufsize + BUFSIZE))){ RETURN(21); }
+						buf = newbuf;
+						bufsize += BUFSIZE;
+					}
+				}
+			}
+			memcpy(buf + inbuf, "<hr>", 4);
+			inbuf += 4;
+			so._closesocket(ftps);
+			ftps = INVALID_SOCKET;
+			param->remsock = s;
+			if (inbuf){
+				buf[inbuf] = 0;
+				if (gotres < 0) res = ftpres(param, (unsigned char *)buf + inbuf, bufsize - inbuf);
+				else res = gotres;
+				inbuf = (int)strlen((char *)buf);
+				if (!headsent){
+					sprintf(ftpbuf,
+						"HTTP/1.0 200 OK\r\n"
+						"Content-Type: text/html\r\n"
+						"Proxy-Connection: keep-alive\r\n"
+						"Content-Length: %d\r\n\r\n",
+						inbuf);
+					socksend(param->clisock, (unsigned char *)ftpbuf, (int)strlen(ftpbuf), conf.timeouts[STRING_S]);
+				}
+				socksend(param->clisock, (unsigned char *)buf, inbuf, conf.timeouts[STRING_S]);
+				if (res){ RETURN(res); }
+				if (!headsent)goto REQUESTEND;
+			}
+			RETURN(0);
+		}
+		RETURN(res);
+	}
+	*/
+
+/*
+	if (isconnect && param->redirtype != R_HTTP) 
+	{
+		do_local_write(param, (unsigned char *)proxy_stringtable[8], (int)strlen(proxy_stringtable[8]));
+		if (param->redirectfunc) return (*param->redirectfunc)(param);
+		param->res = sockmap(param, conf.timeouts[CONNECTION_L]);
+		if (param->redirectfunc) return (*param->redirectfunc)(param);
+		RETURN(param->res);
+	}
+	*/
+
+	if (!req || param->redirtype != R_HTTP) 
+	{
+		reqlen = 0;
+	}
+	/*
+	else 
+	{
+		redirect = 1;
+		if (socksend(param->remsock, (unsigned char *)req, (res = (int)strlen((char *)req)), conf.timeouts[STRING_L]) != res) 
+		{
+			RETURN(518);
+		}
+		param->statscli64 += res;
+		param->nwrites++;
+	}
+	*/
+	inbuf = 0;
+#ifndef ANONYMOUS
+	if (anonymous != 1){
+		sprintf((char*)buf + strlen((char *)buf), "Via: 1.1 ");
+		gethostname((char *)(buf + strlen((char *)buf)), 256);
+		sprintf((char*)buf + strlen((char *)buf), ":%d (%s %s)\r\nX-Forwarded-For: ", (int)ntohs(*SAPORT(&param->srv->intsa)), conf.stringtable ? conf.stringtable[2] : (unsigned char *)"", conf.stringtable ? conf.stringtable[3] : (unsigned char *)"");
+		if (!anonymous)myinet_ntop(*SAFAMILY(&param->sincr), SAADDR(&param->sincr), (char *)buf + strlen((char *)buf), 64);
+		else {
+			unsigned long tmp;
+
+			tmp = ((unsigned long)myrand(param, sizeof(struct clientparam)) << 16) ^ (unsigned long)rand();
+			myinet_ntop(AF_INET, &tmp, (char *)buf + strlen((char *)buf), 64);
+		}
+		sprintf((char*)buf + strlen((char *)buf), "\r\n");
+	}
+#endif
+	if (keepalive <= 1) sprintf((char*)buf + strlen((char *)buf), "%s: %s\r\n", (param->redirtype == R_HTTP) ? "Proxy-Connection" : "Connection", keepalive ? "keep-alive" : "close");
+	if (param->extusername){
+		sprintf((char*)buf + strlen((char *)buf), "%s: basic ", (redirect) ? "Proxy-Authorization" : "Authorization");
+		sprintf((char*)username, "%.32s:%.64s", param->extusername, param->extpassword ? param->extpassword : (unsigned char*)"");
+		en64(username, (unsigned char *)buf + strlen((char *)buf), (int)strlen((char *)username));
+		sprintf((char*)buf + strlen((char *)buf), "\r\n");
+	}
+	sprintf((char*)buf + strlen((char *)buf), "\r\n");
+	if ((res = do_remote_write(param, (unsigned char *)buf + reqlen, (int)strlen((char *)buf + reqlen)) != 0))
+	{
+		RETURN(518);
+	}
+
+	return 0;
 }
 
 int onrecv_clientrequest(struct clientparam * pclient)
